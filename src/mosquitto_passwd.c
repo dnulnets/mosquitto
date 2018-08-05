@@ -47,6 +47,10 @@ Contributors:
 #  include <termios.h>
 #endif
 
+#ifdef WITH_FIPS
+#include <openssl/err.h>
+#endif
+
 #define MAX_BUFFER_LEN 1024
 #define SALT_LEN 12
 
@@ -80,7 +84,7 @@ int base64_encode(unsigned char *in, unsigned int in_len, char **encoded)
 
 void print_usage(void)
 {
-	printf("mosquitto_passwd is a tool for managing password files for mosquitto.\n\n");
+  printf("mosquitto_passwd %s is a tool for managing password files for mosquitto.\n\n", VERSION);
 	printf("Usage: mosquitto_passwd [-c | -D] passwordfile username\n");
 	printf("       mosquitto_passwd -b passwordfile username password\n");
 	printf("       mosquitto_passwd -U passwordfile\n");
@@ -384,6 +388,16 @@ int main(int argc, char *argv[])
 
 	signal(SIGINT, handle_sigint);
 	signal(SIGTERM, handle_sigint);
+
+#ifdef WITH_FIPS
+	int ret = FIPS_mode_set(1);
+	int err = 0;
+	if(ret != 1){
+	    err = ERR_get_error();
+	    fprintf(stderr, "Error: Unable to set FIPS mode, fatal error=%x\n", err);
+	    return 1;
+	}
+#endif
 
 	OpenSSL_add_all_digests();
 

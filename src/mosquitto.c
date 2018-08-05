@@ -48,6 +48,9 @@ Contributors:
 #ifdef WITH_WEBSOCKETS
 #  include <libwebsockets.h>
 #endif
+#ifdef WITH_FIPS
+#include <openssl/err.h>
+#endif
 
 #include "mosquitto_broker_internal.h"
 #include "memory_mosq.h"
@@ -236,6 +239,16 @@ int main(int argc, char *argv[])
 	_setmaxstdio(2048);
 #endif
 
+#ifdef WITH_FIPS
+	int ret = FIPS_mode_set(1);
+	int err = 0;
+	if(ret != 1){
+	    err = ERR_get_error();
+	    log__printf(NULL, MOSQ_LOG_ERR, "Unable to set FIPS mode, fatal error=%x", err);
+	    return 1;
+	}
+#endif
+	
 	memset(&int_db, 0, sizeof(struct mosquitto_db));
 
 	net__init();

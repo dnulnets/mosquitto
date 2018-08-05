@@ -1,7 +1,13 @@
 .PHONY: all test 01 02 03 04 08 09 clean reallyclean
 
+include ../../../config.mk
+
 CFLAGS=-I../../../lib -I../../../lib/cpp -DDEBUG -Werror
 LIBS=../../../lib/libmosquitto.so.1 ../../../lib/cpp/libmosquittopp.so.1
+ifeq ($(WITH_STATIC_LIBRARIES),yes)
+	CFLAGS=$(FIPS_CFLAGS) -I../../../lib -I../../../lib/cpp -DDEBUG -Werror -pthread
+	LIBS=$(FIPS_LDFLAGS) ../../../lib/cpp/libmosquittopp.a ../../../lib/libmosquitto.a -lssl -lcrypto -ldl -lstdc++
+endif
 
 all : 01 02 03 04 08 09
 

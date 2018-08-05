@@ -2,17 +2,27 @@ include ../config.mk
 
 .PHONY: all install uninstall reallyclean clean static static_pub static_sub
 
-all : mosquitto_pub mosquitto_sub
+ALL_DEPS:=
+ifeq ($(WITH_FIPS),yes)
+	ALL_DEPS:=static
+else
+	ALL_DEPS:=dynamic
+endif
+
+all: ${ALL_DEPS}
+
+
+dynamic : mosquitto_pub mosquitto_sub
 
 static : static_pub static_sub
 	# This makes mosquitto_pub/sub versions that are statically linked with
 	# libmosquitto only.
 
 static_pub : pub_client.o client_shared.o ../lib/libmosquitto.a
-	${CROSS_COMPILE}${CC} $^ -o mosquitto_pub ${CLIENT_LDFLAGS} -lssl -lcrypto -lpthread
+	${CROSS_COMPILE}${CC} $^ -o mosquitto_pub ${CLIENT_LDFLAGS} -lssl -lcrypto -lpthread $(FIPS_LDFLAGS_LAST)
 
 static_sub : sub_client.o sub_client_output.o client_shared.o ../lib/libmosquitto.a
-	${CROSS_COMPILE}${CC} $^ -o mosquitto_sub ${CLIENT_LDFLAGS} -lssl -lcrypto -lpthread
+	${CROSS_COMPILE}${CC} $^ -o mosquitto_sub ${CLIENT_LDFLAGS} -lssl -lcrypto -lpthread $(FIPS_LDFLAGS_LAST)
 
 mosquitto_pub : pub_client.o client_shared.o
 	${CROSS_COMPILE}${CC} $^ -o $@ ${CLIENT_LDFLAGS}

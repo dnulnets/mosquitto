@@ -19,6 +19,11 @@ docs :
 binary : mosquitto
 
 mosquitto :
+ifeq ($(WITH_FIPS),yes)
+ifneq ($(CC),fipsld)
+	$(error FIPS enabled mosquitto must be compiled with fipsld, use "make CXX=fipsld CC=fipsld FIPSLD_CC=gcc")
+endif
+endif
 ifeq ($(UNAME),Darwin)
 	$(error Please compile using CMake on Mac OS X)
 endif

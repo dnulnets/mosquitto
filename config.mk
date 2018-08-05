@@ -17,6 +17,21 @@
 # Uncomment to compile the broker with tcpd/libwrap support.
 #WITH_WRAP:=yes
 
+# Uncomment to compile the broker and clients to be FIPS enabled. Note this
+# do not generate any so-files and the ssl and crypto libraries are statically
+# linked. You also need to have a fips enabled openssl and the compliant
+# openssl FIPS 2.0 crypto module compiled and installed at the default
+# directory /usr/local/ssl and /usr/local/ssl/fips-2.0 (or change the FIPSDIR
+# down below). See the fips users guide. https://www.openssl.org/docs/fips.html.
+#
+# You need to make mosquitto with:
+#
+# make CXX=fipsld CC=fipsld FIPSLD_CC=gcc
+#
+# Make sure your PATH has /usr/local/ssl/fips-2.0/bin:/usr/local/ssl/bin added
+# to the beginning, otherwise the fipsld command will fail.
+WITH_FIPS:=yes
+
 # Comment out to disable SSL/TLS support in the broker and client.
 # Disabling this will also mean that passwords must be stored in plain text. It
 # is strongly recommended that you only disable WITH_TLS if you are not using
@@ -84,7 +99,7 @@ WITH_SOCKS:=yes
 WITH_STRIP:=no
 
 # Build static libraries
-WITH_STATIC_LIBRARIES:=no
+#WITH_STATIC_LIBRARIES:=yes
 
 # Build with async dns lookup support for bridges (temporary). Requires glibc.
 #WITH_ADNS:=yes
@@ -96,10 +111,12 @@ WITH_EPOLL:=yes
 # End of user configuration
 # =============================================================================
 
-
 # Also bump lib/mosquitto.h, CMakeLists.txt,
 # installer/mosquitto.nsi, installer/mosquitto64.nsi
 VERSION=1.5
+ifeq ($(WITH_FIPS),yes)
+	VERSION=1.5-fips
+endif
 
 # Client library SO version. Bump if incompatible API/ABI changes are made.
 SOVERSION=1
@@ -120,14 +137,36 @@ ifeq ($(UNAME),SunOS)
 		CFLAGS?=-Wall -ggdb -O2
 	endif
 else
-	CFLAGS?=-Wall -ggdb -O2
+	CFLAGS?=-Wall -ggdb -O2 
+endif
+
+# FIPS setup
+ifeq ($(WITH_FIPS),yes)
+	# We need to have the openssl fips 2.0 crypto module and a fips  enabled openssl environment installed
+	# at FIPSDIR. This is the default location when building and installing the openssl and the crypto module
+	# executables and libraries. See openssl users guide for fips.
+	FIPSDIR:=/usr/local/ssl
+	FIPS_LDFLAGS:=-L$(FIPSDIR)/lib
+	FIPS_LDFLAGS_LAST:=-ldl
+	FIPS_CFLAGS:=-DWITH_FIPS -I$(FIPSDIR)/include
+	WITH_STATIC_LIBRARIES:=yes
+
+	# Only support for Linux so far
+	ifneq ($(UNAME),Linux)
+		# Should fail if we are not Linux because only tested for that environment so far
+	endif
+else
+	FIPSDIR:=
+	FIPS_LDFLAGS:=
+	FIPS_LDFLAGS_LAST:=
+	FIPS_CFLAGS:=
 endif
 
 LIB_CFLAGS:=${CFLAGS} ${CPPFLAGS} -I. -I.. -I../lib
 LIB_CXXFLAGS:=$(CFLAGS) ${CPPFLAGS} -I. -I.. -I../lib
 LIB_LDFLAGS:=${LDFLAGS}
 
-BROKER_CFLAGS:=${LIB_CFLAGS} ${CPPFLAGS} -DVERSION="\"${VERSION}\"" -DWITH_BROKER
+BROKER_CFLAGS:=${LIB_CFLAGS} ${CPPFLAGS} -DVERSION="\"${VERSION}\"" -DWITH_BROKER -I../lib
 CLIENT_CFLAGS:=${CFLAGS} ${CPPFLAGS} -I../lib -DVERSION="\"${VERSION}\""
 
 ifneq ($(or $(findstring $(UNAME),FreeBSD), $(findstring $(UNAME),OpenBSD)),)
@@ -143,7 +182,11 @@ ifeq ($(UNAME),Linux)
 	LIB_LIBS:=$(LIB_LIBS) -lrt
 endif
 
-CLIENT_LDFLAGS:=$(LDFLAGS) -L../lib ../lib/libmosquitto.so.${SOVERSION}
+ifeq ($(WITH_STATIC_LIBRARIES),yes)
+	CLIENT_LDFLAGS:=$(LDFLAGS) $(FIPS_LDFLAGS) -L../lib ../lib/libmosquitto.a
+else
+	CLIENT_LDFLAGS:=$(LDFLAGS) $(FIPS_LDFLAGS) -L../lib ../lib/libmosquitto.so.${SOVERSION}
+endif
 
 ifeq ($(UNAME),SunOS)
 	ifeq ($(CC),cc)
@@ -177,17 +220,17 @@ ifeq ($(WITH_WRAP),yes)
 endif
 
 ifeq ($(WITH_TLS),yes)
-	BROKER_LIBS:=$(BROKER_LIBS) -lssl -lcrypto
-	LIB_LIBS:=$(LIB_LIBS) -lssl -lcrypto
-	BROKER_CFLAGS:=$(BROKER_CFLAGS) -DWITH_TLS
-	LIB_CFLAGS:=$(LIB_CFLAGS) -DWITH_TLS
-	PASSWD_LIBS:=-lcrypto
-	CLIENT_CFLAGS:=$(CLIENT_CFLAGS) -DWITH_TLS
+	BROKER_LIBS:=$(BROKER_LIBS) $(FIPS_LDFLAGS) -lssl -lcrypto
+	LIB_LIBS:=$(LIB_LIBS) $(FIPS_LDFLAGS) -lssl -lcrypto
+	BROKER_CFLAGS:=$(BROKER_CFLAGS) $(FIPS_CFLAGS) -DWITH_TLS
+	LIB_CFLAGS:=$(LIB_CFLAGS) $(FIPS_CFLAGS) -DWITH_TLS
+	PASSWD_LIBS:=$(FIPS_LDFLAGS) -lssl -lcrypto $(FIPS_LDFLAGS_LAST)
+	CLIENT_CFLAGS:=$(CLIENT_CFLAGS) $(FIPS_CFLAGS) -DWITH_TLS
 
 	ifeq ($(WITH_TLS_PSK),yes)
-		BROKER_CFLAGS:=$(BROKER_CFLAGS) -DWITH_TLS_PSK
-		LIB_CFLAGS:=$(LIB_CFLAGS) -DWITH_TLS_PSK
-		CLIENT_CFLAGS:=$(CLIENT_CFLAGS) -DWITH_TLS_PSK
+		BROKER_CFLAGS:=$(BROKER_CFLAGS) $(FIPS_CFLAGS) -DWITH_TLS_PSK
+		LIB_CFLAGS:=$(LIB_CFLAGS) $(FIPS_CFLAG) -DWITH_TLS_PSK
+		CLIENT_CFLAGS:=$(CLIENT_CFLAGS) $(FIPS_CFLAGS) -DWITH_TLS_PSK
 	endif
 endif
 
@@ -241,6 +284,11 @@ ifeq ($(WITH_SRV),yes)
 	CLIENT_CFLAGS:=$(CLIENT_CFLAGS) -DWITH_SRV
 endif
 
+ifeq ($(WITH_WEBSOCKETS),yes)
+	BROKER_CFLAGS:=$(BROKER_CFLAGS) -DWITH_WEBSOCKETS
+	BROKER_LIBS:=$(BROKER_LIBS) -lwebsockets
+endif
+
 ifeq ($(UNAME),SunOS)
 	BROKER_LIBS:=$(BROKER_LIBS) -lsocket -lnsl
 	LIB_LIBS:=$(LIB_LIBS) -lsocket -lnsl
@@ -258,16 +306,6 @@ endif
 MAKE_ALL:=mosquitto
 ifeq ($(WITH_DOCS),yes)
 	MAKE_ALL:=$(MAKE_ALL) docs
-endif
-
-ifeq ($(WITH_WEBSOCKETS),yes)
-	BROKER_CFLAGS:=$(BROKER_CFLAGS) -DWITH_WEBSOCKETS
-	BROKER_LIBS:=$(BROKER_LIBS) -lwebsockets
-endif
-
-ifeq ($(WITH_WEBSOCKETS),static)
-	BROKER_CFLAGS:=$(BROKER_CFLAGS) -DWITH_WEBSOCKETS
-	BROKER_LIBS:=$(BROKER_LIBS) -static -lwebsockets
 endif
 
 INSTALL?=install

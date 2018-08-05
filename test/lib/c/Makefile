@@ -1,7 +1,13 @@
 .PHONY: all test 01 02 03 04 08 09 clean reallyclean
 
+include ../../../config.mk
+
 CFLAGS=-I../../../lib -Werror
 LIBS=../../../lib/libmosquitto.so.1
+ifeq ($(WITH_STATIC_LIBRARIES),yes)
+	CFLAGS=$(FIPS_CFLAGS) -I../../../lib -Werror -pthread
+	LIBS=$(FIPS_LDFLAGS) ../../../lib/libmosquitto.a -lssl -lcrypto -ldl
+endif
 
 all : 01 02 03 04 08 09
 

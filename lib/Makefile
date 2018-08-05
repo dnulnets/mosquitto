@@ -38,7 +38,9 @@ MOSQ_OBJS=mosquitto.o \
 		  util_mosq.o \
 		  will_mosq.o
 
-ALL_DEPS=libmosquitto.so.${SOVERSION}
+ifneq ($(WITH_FIPS),yes)
+	ALL_DEPS=libmosquitto.so.${SOVERSION}
+endif
 
 ifeq ($(WITH_STATIC_LIBRARIES),yes)
 	ALL_DEPS+=libmosquitto.a
@@ -49,8 +51,10 @@ all : ${ALL_DEPS}
 
 install : all
 	$(INSTALL) -d "${DESTDIR}$(prefix)/lib${LIB_SUFFIX}/"
+ifneq ($(WITH_FIPS),yes)
 	$(INSTALL) ${STRIP_OPTS} libmosquitto.so.${SOVERSION} "${DESTDIR}${prefix}/lib${LIB_SUFFIX}/libmosquitto.so.${SOVERSION}"
 	ln -sf libmosquitto.so.${SOVERSION} "${DESTDIR}${prefix}/lib${LIB_SUFFIX}/libmosquitto.so"
+endif
 ifeq ($(WITH_STATIC_LIBRARIES),yes)
 	$(INSTALL) libmosquitto.a "${DESTDIR}${prefix}/lib${LIB_SUFFIX}/libmosquitto.a"
 	${CROSS_COMPILE}${STRIP} -g --strip-unneeded "${DESTDIR}${prefix}/lib${LIB_SUFFIX}/libmosquitto.a"

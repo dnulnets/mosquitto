@@ -6,25 +6,30 @@ endif
 
 .PHONY : clean install
 
-ALL_DEPS=libmosquittopp.so.${SOVERSION}
+ALL_DEPS:=
+ifneq ($(WITH_FIPS),yes)
+	ALL_DEPS:=libmosquittopp.so.${SOVERSION}
+endif
 
 ifeq ($(WITH_STATIC_LIBRARIES),yes)
-    ALL_DEPS+=libmosquittopp.a
+	ALL_DEPS+=libmosquittopp.a
 endif
 
 all : ${ALL_DEPS}
 
 install : all
 	$(INSTALL) -d "${DESTDIR}$(prefix)/lib${LIB_SUFFIX}/"
+ifneq ($(WITH_FIPS),yes)
 	$(INSTALL) ${STRIP_OPTS} libmosquittopp.so.${SOVERSION} "${DESTDIR}${prefix}/lib${LIB_SUFFIX}/libmosquittopp.so.${SOVERSION}"
 	ln -sf libmosquittopp.so.${SOVERSION} "${DESTDIR}${prefix}/lib${LIB_SUFFIX}/libmosquittopp.so"
+endif
 ifeq ($(WITH_STATIC_LIBRARIES),yes)
 	$(INSTALL) libmosquittopp.a "${DESTDIR}${prefix}/lib${LIB_SUFFIX}/libmosquittopp.a"
 	${CROSS_COMPILE}${STRIP} -g --strip-unneeded "${DESTDIR}${prefix}/lib${LIB_SUFFIX}/libmosquittopp.a"
 endif
 	$(INSTALL) -d "${DESTDIR}${prefix}/include/"
 	$(INSTALL) mosquittopp.h "${DESTDIR}${prefix}/include/mosquittopp.h"
-	
+
 uninstall :
 	-rm -f "${DESTDIR}${prefix}/lib${LIB_SUFFIX}/libmosquittopp.so.${SOVERSION}"
 	-rm -f "${DESTDIR}${prefix}/lib${LIB_SUFFIX}/libmosquittopp.so"

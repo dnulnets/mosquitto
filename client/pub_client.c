@@ -30,6 +30,10 @@ Contributors:
 #define snprintf sprintf_s
 #endif
 
+#ifdef WITH_FIPS
+#include <openssl/err.h>
+#endif
+
 #include <mosquitto.h>
 #include "client_shared.h"
 
@@ -306,12 +310,22 @@ int main(int argc, char *argv[])
 	int read_len;
 	int pos;
 
+#ifdef WITH_FIPS
+	int ret = FIPS_mode_set(1);
+	int err = 0;
+	if(ret != 1){
+	    err = ERR_get_error();
+	    fprintf(stderr, "Error: Unable to set FIPS mode, fatal error=%x\n", err);
+	    return 1;
+	}
+#endif
+
 	buf = malloc(buf_len);
 	if(!buf){
 		fprintf(stderr, "Error: Out of memory.\n");
 		return 1;
 	}
-
+	
 	memset(&cfg, 0, sizeof(struct mosq_config));
 	rc = client_config_load(&cfg, CLIENT_PUB, argc, argv);
 	if(rc){

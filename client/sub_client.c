@@ -31,6 +31,10 @@ Contributors:
 #define snprintf sprintf_s
 #endif
 
+#ifdef WITH_FIPS
+#include <openssl/err.h>
+#endif
+
 #include <mosquitto.h>
 #include "client_shared.h"
 
@@ -238,7 +242,17 @@ int main(int argc, char *argv[])
 #ifndef WIN32
 		struct sigaction sigact;
 #endif
-	
+
+#ifdef WITH_FIPS
+	int ret = FIPS_mode_set(1);
+	int err = 0;
+	if(ret != 1){
+	    err = ERR_get_error();
+	    fprintf(stderr, "Error: Unable to set FIPS mode, fatal error=%x\n", err);
+	    return 1;
+	}
+#endif
+		
 	memset(&cfg, 0, sizeof(struct mosq_config));
 
 	rc = client_config_load(&cfg, CLIENT_SUB, argc, argv);
